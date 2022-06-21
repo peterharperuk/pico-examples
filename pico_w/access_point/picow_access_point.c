@@ -124,7 +124,6 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         DEBUG_printf("connection closed\n");
         return ERR_OK;
     }
-    CYW43_THREAD_ENTER;
     if (p->tot_len > 0) {
         DEBUG_printf("tcp_server_recv %d err %d\n", p->tot_len, err);
 #if 0
@@ -190,7 +189,6 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         tcp_recved(tpcb, p->tot_len);
     }
     pbuf_free(p);
-    CYW43_THREAD_EXIT;
     return ERR_OK;
 }
 
