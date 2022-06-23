@@ -13,6 +13,7 @@
 #include "lwip/tcp.h"
 
 #include "dhcpserver.h"
+#include "dnsserver.h"
 
 #define TCP_PORT 80
 #define DEBUG_printf printf
@@ -23,6 +24,7 @@
 #define LED_PARAM "led=%d"
 #define LED_TEST "/ledtest"
 #define LED_GPIO 0
+#define HTTP_RESPONSE_REDIRECT "HTTP/1.1 302 Redirect\nLocation: http://%s" LED_TEST "\n\n"
 
 typedef struct TCP_SERVER_T_ {
     struct tcp_pcb *server_pcb;
@@ -33,6 +35,7 @@ typedef struct TCP_SERVER_T_ {
     int header_len;
     int result_len;
     int sent_len;
+    ip_addr_t gw;
 } TCP_SERVER_T;
 
 static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err);
@@ -128,7 +131,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         DEBUG_printf("tcp_server_recv %d err %d\n", p->tot_len, err);
 #if 0
         for (struct pbuf *q = p; q != NULL; q = q->next) {
-            DEBUG_printf("in: %*s\n", q->len, q->payload);
+            DEBUG_printf("in: %.*s\n", q->len, q->payload);
         }
 #endif
         // Copy the request into the buffer
@@ -162,11 +165,18 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
             }
 
             // Generate web page
-            state->header_len = snprintf(state->headers, sizeof(state->headers), HTTP_RESPONSE_HEADERS,
-                state->result_len ? 200 : 404, state->result_len);
-            if (state->header_len > sizeof(state->headers) - 1) {
-                DEBUG_printf("Too much header data %d\n", state->header_len);
-                return tcp_ap_result(arg, -1);
+            if (state->result_len > 0) {
+                state->header_len = snprintf(state->headers, sizeof(state->headers), HTTP_RESPONSE_HEADERS,
+                    200, state->result_len);
+                if (state->header_len > sizeof(state->headers) - 1) {
+                    DEBUG_printf("Too much header data %d\n", state->header_len);
+                    return tcp_ap_result(arg, -1);
+                }
+            } else {
+                // Send redirect
+                state->header_len = snprintf(state->headers, sizeof(state->headers), HTTP_RESPONSE_REDIRECT,
+                    ipaddr_ntoa(&state->gw));
+                DEBUG_printf("Sending redirect %s", state->headers);
             }
 
             // Send the headers to the client
@@ -269,7 +279,7 @@ int main() {
     }
 
     if (cyw43_arch_init()) {
-        printf("failed to initialise\n");
+        DEBUG_printf("failed to initialise\n");
         return 1;
     }
     const char *ap_name = "picow_test";
@@ -281,13 +291,17 @@ int main() {
 
     cyw43_arch_enable_ap_mode(ap_name, password, CYW43_AUTH_WPA2_AES_PSK);
 
-    ip4_addr_t gw, mask;
-    IP4_ADDR(&gw, 192, 168, 4, 1);
+    ip4_addr_t mask;
+    IP4_ADDR(&state->gw, 192, 168, 4, 1);
     IP4_ADDR(&mask, 255, 255, 255, 0);
 
     // Start the dhcp server
     dhcp_server_t dhcp_server;
-    dhcp_server_init(&dhcp_server, &gw, &mask);
+    dhcp_server_init(&dhcp_server, &state->gw, &mask);
+
+    // Start the dns server
+    dns_server_t dns_server;
+    dns_server_init(&dns_server, &state->gw);
 
     if (!tcp_server_open(state)) {
         DEBUG_printf("failed to open server\n");
@@ -309,6 +323,7 @@ int main() {
         sleep_ms(1000);
 #endif
     }
+    dns_server_deinit(&dns_server);
     dhcp_server_deinit(&dhcp_server);
     cyw43_arch_deinit();
     return 0;
