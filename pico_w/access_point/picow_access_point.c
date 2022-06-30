@@ -28,72 +28,61 @@
 
 typedef struct TCP_SERVER_T_ {
     struct tcp_pcb *server_pcb;
-    struct tcp_pcb *client_pcb;
     bool complete;
+    ip_addr_t gw;
+} TCP_SERVER_T;
+
+typedef struct TCP_CONNECT_STATE_T_ {
+    struct tcp_pcb *pcb;
+    int sent_len;
     char headers[128];
     char result[256];
     int header_len;
     int result_len;
-    int sent_len;
-    ip_addr_t gw;
-} TCP_SERVER_T;
+    ip_addr_t *gw;
+} TCP_CONNECT_STATE_T;
 
-static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err);
-
-static err_t tcp_close_client_connection(void *arg) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-    err_t err = ERR_OK;
-    if (state->client_pcb != NULL) {
-        tcp_arg(state->client_pcb, NULL);
-        tcp_poll(state->client_pcb, NULL, 0);
-        tcp_sent(state->client_pcb, NULL);
-        tcp_recv(state->client_pcb, NULL);
-        tcp_err(state->client_pcb, NULL);
-        err = tcp_close(state->client_pcb);
+static err_t tcp_close_client_connection(TCP_CONNECT_STATE_T *con_state, struct tcp_pcb *client_pcb, err_t close_err) {
+    if (client_pcb) {
+        assert(con_state && con_state->pcb == client_pcb);
+        tcp_arg(client_pcb, NULL);
+        tcp_poll(client_pcb, NULL, 0);
+        tcp_sent(client_pcb, NULL);
+        tcp_recv(client_pcb, NULL);
+        tcp_err(client_pcb, NULL);
+        err_t err = tcp_close(client_pcb);
         if (err != ERR_OK) {
             DEBUG_printf("close failed %d, calling abort\n", err);
-            tcp_abort(state->client_pcb);
-            err = ERR_ABRT;
+            tcp_abort(client_pcb);
+            close_err = ERR_ABRT;
         }
-        state->client_pcb = NULL;
+        if (con_state) {
+            free(con_state);
+        }
     }
-    return err;
+    return close_err;
 }
 
-static err_t tcp_server_close(void *arg) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-    err_t err = tcp_close_client_connection(arg);
+static void tcp_server_close(TCP_SERVER_T *state) {
     if (state->server_pcb) {
         tcp_arg(state->server_pcb, NULL);
         tcp_close(state->server_pcb);
         state->server_pcb = NULL;
     }
-    return err;
 }
 
-static err_t tcp_ap_result(void *arg, int status) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-    if (status == 0) {
-        DEBUG_printf("test success\n");
-    } else {
-        DEBUG_printf("test failed %d\n", status);
-    }
-    state->complete = true;
-    return tcp_server_close(arg);
-}
-
-static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
+static err_t tcp_server_sent(void *arg, struct tcp_pcb *pcb, u16_t len) {
+    TCP_CONNECT_STATE_T *con_state = (TCP_CONNECT_STATE_T*)arg;
     DEBUG_printf("tcp_server_sent %u\n", len);
-    state->sent_len += len;
-    if (state->sent_len >= state->header_len + state->result_len) {
+    con_state->sent_len += len;
+    if (con_state->sent_len >= con_state->header_len + con_state->result_len) {
         DEBUG_printf("all done\n");
-        tcp_close_client_connection(arg);
+        return tcp_close_client_connection(con_state, pcb, ERR_OK);
     }
     return ERR_OK;
 }
 
-int test_server_content(TCP_SERVER_T *state, const char *request, const char *params, char *result) {
+int test_server_content(TCP_CONNECT_STATE_T *con_state, const char *request, const char *params, char *result) {
     int len = 0;
     if (strncmp(request, LED_TEST, sizeof(LED_TEST) - 1) == 0) {
         // Get the state of the led
@@ -115,18 +104,19 @@ int test_server_content(TCP_SERVER_T *state, const char *request, const char *pa
             }
         }
         // Generate result
-        len = snprintf(state->result, sizeof(state->result), LED_TEST_BODY,
+        len = snprintf(con_state->result, sizeof(con_state->result), LED_TEST_BODY,
             led_state ? "ON" : "OFF", led_state ? 0 : 1, led_state ? "OFF" : "ON");
     }
     return len;
 }
 
-err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
+err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err) {
+    TCP_CONNECT_STATE_T *con_state = (TCP_CONNECT_STATE_T*)arg;
     if (!p) {
         DEBUG_printf("connection closed\n");
-        return ERR_OK;
+        return tcp_close_client_connection(con_state, pcb, ERR_OK);
     }
+    assert(con_state && con_state->pcb == pcb);
     if (p->tot_len > 0) {
         DEBUG_printf("tcp_server_recv %d err %d\n", p->tot_len, err);
 #if 0
@@ -135,11 +125,11 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         }
 #endif
         // Copy the request into the buffer
-        pbuf_copy_partial(p, state->headers, p->tot_len > sizeof(state->headers) - 1 ? sizeof(state->headers) - 1 : p->tot_len, 0);
+        pbuf_copy_partial(p, con_state->headers, p->tot_len > sizeof(con_state->headers) - 1 ? sizeof(con_state->headers) - 1 : p->tot_len, 0);
 
         // Handle GET request
-        if (strncmp(HTTP_GET, state->headers, sizeof(HTTP_GET) - 1) == 0) {
-            char *request = state->headers + sizeof(HTTP_GET); // + space
+        if (strncmp(HTTP_GET, con_state->headers, sizeof(HTTP_GET) - 1) == 0) {
+            char *request = con_state->headers + sizeof(HTTP_GET); // + space
             char *params = strchr(request, '?');
             if (params) {
                 if (*params) {
@@ -154,64 +144,65 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
             }
 
             // Generate content
-            state->result_len = test_server_content(state, request, params, state->result);
+            con_state->result_len = test_server_content(con_state, request, params, con_state->result);
             DEBUG_printf("Request: %s?%s\n", request, params);
-            DEBUG_printf("Result: %d\n", state->result_len);
+            DEBUG_printf("Result: %d\n", con_state->result_len);
 
             // Check we had enough buffer space
-            if (state->result_len > sizeof(state->result) - 1) {
-                DEBUG_printf("Too much result data %d\n", state->result_len);
-                return tcp_ap_result(arg, -1);
+            if (con_state->result_len > sizeof(con_state->result) - 1) {
+                DEBUG_printf("Too much result data %d\n", con_state->result_len);
+                return tcp_close_client_connection(con_state, pcb, ERR_CLSD);
             }
 
             // Generate web page
-            if (state->result_len > 0) {
-                state->header_len = snprintf(state->headers, sizeof(state->headers), HTTP_RESPONSE_HEADERS,
-                    200, state->result_len);
-                if (state->header_len > sizeof(state->headers) - 1) {
-                    DEBUG_printf("Too much header data %d\n", state->header_len);
-                    return tcp_ap_result(arg, -1);
+            if (con_state->result_len > 0) {
+                con_state->header_len = snprintf(con_state->headers, sizeof(con_state->headers), HTTP_RESPONSE_HEADERS,
+                    200, con_state->result_len);
+                if (con_state->header_len > sizeof(con_state->headers) - 1) {
+                    DEBUG_printf("Too much header data %d\n", con_state->header_len);
+                    return tcp_close_client_connection(con_state, pcb, ERR_CLSD);
                 }
             } else {
                 // Send redirect
-                state->header_len = snprintf(state->headers, sizeof(state->headers), HTTP_RESPONSE_REDIRECT,
-                    ipaddr_ntoa(&state->gw));
-                DEBUG_printf("Sending redirect %s", state->headers);
+                con_state->header_len = snprintf(con_state->headers, sizeof(con_state->headers), HTTP_RESPONSE_REDIRECT,
+                    ipaddr_ntoa(con_state->gw));
+                DEBUG_printf("Sending redirect %s", con_state->headers);
             }
 
             // Send the headers to the client
-            state->sent_len = 0;
-            err_t err = tcp_write(tpcb, state->headers, state->header_len, 0);
+            con_state->sent_len = 0;
+            err_t err = tcp_write(pcb, con_state->headers, con_state->header_len, 0);
             if (err != ERR_OK) {
                 DEBUG_printf("failed to write header data %d\n", err);
-                return tcp_ap_result(arg, -1);
+                return tcp_close_client_connection(con_state, pcb, err);
             }
 
             // Send the body to the client
-            if (state->result_len) {
-                err = tcp_write(tpcb, state->result, state->result_len, 0);
+            if (con_state->result_len) {
+                err = tcp_write(pcb, con_state->result, con_state->result_len, 0);
                 if (err != ERR_OK) {
                     DEBUG_printf("failed to write result data %d\n", err);
-                    return tcp_ap_result(arg, -1);
+                    return tcp_close_client_connection(con_state, pcb, err);
                 }
             }
         }
-        tcp_recved(tpcb, p->tot_len);
+        tcp_recved(pcb, p->tot_len);
     }
     pbuf_free(p);
     return ERR_OK;
 }
 
-static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb) {
+static err_t tcp_server_poll(void *arg, struct tcp_pcb *pcb) {
+    TCP_CONNECT_STATE_T *con_state = (TCP_CONNECT_STATE_T*)arg;
     DEBUG_printf("tcp_server_poll_fn\n");
-    tcp_close_client_connection(arg); // Just disconnect clent?
-    return ERR_OK;
+    return tcp_close_client_connection(con_state, pcb, ERR_OK); // Just disconnect clent?
 }
 
 static void tcp_server_err(void *arg, err_t err) {
+    TCP_CONNECT_STATE_T *con_state = (TCP_CONNECT_STATE_T*)arg;
     if (err != ERR_ABRT) {
         DEBUG_printf("tcp_client_err_fn %d\n", err);
-        tcp_ap_result(arg, err);
+        tcp_close_client_connection(con_state, con_state->pcb, err);
     }
 }
 
@@ -219,17 +210,21 @@ static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
     TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
     if (err != ERR_OK || client_pcb == NULL) {
         DEBUG_printf("failure in accept\n");
-        tcp_ap_result(arg, err);
-        return ERR_VAL;
-    }
-    if (state->client_pcb) {
-        DEBUG_printf("duplicate accept ignored\n");
         return ERR_VAL;
     }
     DEBUG_printf("client connected\n");
 
-    state->client_pcb = client_pcb;
-    tcp_arg(client_pcb, state);
+    // Create the state for the connection
+    TCP_CONNECT_STATE_T *con_state = calloc(1, sizeof(TCP_CONNECT_STATE_T));
+    if (!con_state) {
+        DEBUG_printf("failed to allocate connect state\n");
+        return ERR_MEM;
+    }
+    con_state->pcb = client_pcb; // for checking
+    con_state->gw = &state->gw;
+
+    // setup connection to client
+    tcp_arg(client_pcb, con_state);
     tcp_sent(client_pcb, tcp_server_sent);
     tcp_recv(client_pcb, tcp_server_recv);
     tcp_poll(client_pcb, tcp_server_poll, POLL_TIME_S * 2);
@@ -305,7 +300,7 @@ int main() {
 
     if (!tcp_server_open(state)) {
         DEBUG_printf("failed to open server\n");
-        tcp_ap_result(state, -1);
+        return 1;
     }
 
     while(!state->complete) {
