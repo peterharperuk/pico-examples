@@ -21,10 +21,10 @@ if (PICO_CYW43_SUPPORTED) # set by BOARD=pico-w
             add_subdirectory(tcp_client)
             add_subdirectory(tcp_server)
             add_subdirectory(freertos)
-            if ("${MBEDTLS_DIR}" STREQUAL "")
-                message("Skipping tls examples as MBEDTLS_DIR is not defined")
+
+            if (NOT PICO_MBEDTLS_PATH)
+                message("Skipping tls examples as PICO_MBEDTLS_PATH is not defined")
             else()
-                message("Using mbedtls from ${MBEDTLS_DIR}")
                 add_subdirectory(tls_client)
             endif()
         endif()
