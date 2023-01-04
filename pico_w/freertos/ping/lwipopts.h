@@ -16,6 +16,9 @@
 
 // not necessary, can be done either way
 #define LWIP_TCPIP_CORE_LOCKING_INPUT 1
+
+// Give the tcp thread a high priority
+#define TCPIP_THREAD_PRIO 16
 #endif
 
 #endif
