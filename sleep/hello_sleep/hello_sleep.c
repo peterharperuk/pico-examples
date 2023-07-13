@@ -15,7 +15,6 @@ static bool awake;
 static void sleep_callback(void) {
     printf("RTC woke us up\n");
     awake = true;
-    uart_default_tx_wait_blocking();
 }
 
 static void rtc_sleep(void) {
@@ -53,11 +52,6 @@ static void rtc_sleep(void) {
 }
 
 int main() {
-    
-    /*To communicate over serial USB instead of UART:
-    -Add 'pico_enable_stdio_usb(hello_sleep 1)' and 'pico_enable_stdio_uart(hello_sleep 0)' to the CMakeLists.txt file
-    -Be careful not to add too many printf statements without adding delays between them, which can overload the serial port
-    -Note that USB Serial will be enabled during sleep mode if a USB device is connected, TODO: Should this be configurable?*/
 
     stdio_init_all();
 
@@ -82,11 +76,13 @@ int main() {
         printf("Should be sleeping\n");
     }
 
+    /*Re-enabling clock sources and generators. Note we do not reinitialise the clocks with clock_init() 
+    as this would result in UART running at the system clock frequency (125 MHz) and giving garbled output*/
     sleep_power_up();
 
-    printf("ROSC restarted!\n");
-
     uart_default_tx_wait_blocking();
+
+    printf("ROSC restarted!\n");
 
     return 0;
 }
