@@ -5,7 +5,7 @@
  */
 
 /*In its current state, this is unreliable. The program usually runs for some unpredictable amount of time (anywhere in the range 30-100 loops)
-  However, after this the USB device fails to enumerate correctly and terminates the program*/
+  However, after this the USB device fails to enumerate correctly and terminates the program. The issue seems to be related to power draw*/
 
 
 #include <stdio.h>
@@ -62,12 +62,17 @@ int main() {
 
     while(true)
     {
-        while(tud_task_event_ready())
-        {
-            tight_loop_contents(); //Nop until the USB xfer is complete, otherwise we might get strange output
-        }
+
+        //Let USB enumerate
+        //FIXME: Any better way to do this with tight loop contents?
+        sleep_ms(5000);
 
         printf("Switching to XOSC\n");
+
+        while(tud_task_event_ready())
+        {
+            tight_loop_contents(); //Nop until the USB xfer is complete to ensure we get reliable output
+        }
 
         sleep_run_from_xosc();
 
@@ -97,9 +102,6 @@ int main() {
             tight_loop_contents();
         }
 
-        sleep_ms(1000);
-
-        printf("USB re-initialised!\n");
     }
 
     return 0;
