@@ -1,0 +1,6 @@
+add_executable(sleep_temperature_sensor sleep_temperature_sensor.c)
+
+target_link_libraries(sleep_temperature_sensor pico_stdlib hardware_adc hardware_dma hardware_sleep)
+
+# create map/bin/hex file etc.
+pico_add_extra_outputs(sleep_temperature_sensor)

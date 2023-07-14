@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
-
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "hardware/adc.h"
+#include "hardware/resets.h"
 #include "pico/sleep.h"
-#include "hardware/clocks.h"
-#include "hardware/pll.h"
 
-static bool awake;
+#define TEMPERATURE_UNITS 'C'
+#define POLLING_INTERVAL 10
 
-static void sleep_callback(void) {
+void sleep_callback()
+{
     printf("RTC woke us up\n");
     uart_default_tx_wait_blocking();
-    awake = true;
 }
 
-static void rtc_sleep(void) {
+float read_onboard_temperature(const char unit) {
+    
+    /* 12-bit conversion, assume max value == ADC_VREF == 3.3 V */
+    const float conversionFactor = 3.3f / (1 << 12);
+
+    float adc = (float)adc_read() * conversionFactor;
+    float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
+
+    if (unit == 'C') {
+        return tempC;
+    } else if (unit == 'F') {
+        return tempC * 9 / 5 + 32;
+    }
+
+    return -1.0f;
+}
+
+void rtc_sleep()
+{
     // Start on Wednesday 5th of July 2023 12:00:00
     datetime_t t = {
             .year  = 2023,
@@ -38,7 +51,7 @@ static void rtc_sleep(void) {
             .dotw  = 3, // 0 is Sunday, so 3 is Wednesday
             .hour  = 12,
             .min   = 00,
-            .sec   = 10
+            .sec   = POLLING_INTERVAL
     };
 
     // Start the RTC
@@ -52,49 +65,36 @@ static void rtc_sleep(void) {
     sleep_goto_sleep_until(&t_alarm, &sleep_callback);
 }
 
-int main() {
 
+int main()
+{
     stdio_init_all();
 
-    printf("Hello Sleep!\n");
+    //Initialise the ADC and configure it to take input from the onboard temperature sensor
+    adc_init();
+    adc_select_input(4);
+    adc_set_temp_sensor_enabled(true);
 
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-
-    while(true) {
-
-        printf("Switching to XOSC\n");
+    while(true)
+    {
+        float temperature = read_onboard_temperature(TEMPERATURE_UNITS);
+        printf("Temperature is %.02f %c\n", temperature, TEMPERATURE_UNITS);
 
         // Wait for the fifo to be drained so we get reliable output
         uart_default_tx_wait_blocking();
 
-        //UART will be reconfigured by sleep_run_from_xosc
+        /*Set the crystal oscillator as the dormant clock source, UART will be reconfigured from here
+        This is necessary before sending the pico to sleep*/
         sleep_run_from_xosc();
 
-        printf("Switched to XOSC\n");
-
-        awake = false;
-
         rtc_sleep();
-
-        // Make sure we don't wake
-        while (!awake) {
-            printf("Should be sleeping\n");
-        }
 
         //Re-enabling clock sources and generators.
         sleep_power_up();
 
-        printf("ROSC restarted!\n");
-        
-        for (int i = 0; i < 5; i++)
-        {
-            gpio_put(PICO_DEFAULT_LED_PIN, 1);
-            sleep_ms(250);
-            gpio_put(PICO_DEFAULT_LED_PIN, 0);
-            sleep_ms(250);
-        }
+        printf("ROSC Restarted!\n");
     }
 
     return 0;
+
 }

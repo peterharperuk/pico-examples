@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-/*In its current state, this is unreliable. The program usually runs for some unpredictable amount of time (anywhere in the range 30-100 loops)
+/*In its current state, this is unreliable. The program usually runs for some unpredictable amount of time (anywhere in the range 30-50 loops)
   However, after this the USB device fails to enumerate correctly and terminates the program. The issue seems to be related to power draw*/
 
 
@@ -71,7 +71,7 @@ int main() {
 
         while(tud_task_event_ready())
         {
-            tight_loop_contents(); //Nop until the USB xfer is complete to ensure we get reliable output
+            tight_loop_contents(); //Nop until the USB txfer is complete so we get reliable output
         }
 
         sleep_run_from_xosc();
@@ -87,14 +87,12 @@ int main() {
 
         //Re-enabling clock sources and generators
         sleep_power_up();
-        clocks_init();
 
         //Re-enumerate the USB device
         //FIXME: Should this go into the sleep_power_up() function so its abstracted away?
         tud_disconnect();
-        while(tud_connected())
-        {
-            tight_loop_contents();
+        while(tud_connected())  {
+            tight_loop_contents(); //Make sure we actually disconnect before attempting to connect again
         }
         tud_connect();
         while(!tud_connected())
