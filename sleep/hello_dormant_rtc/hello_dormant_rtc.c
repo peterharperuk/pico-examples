@@ -62,7 +62,8 @@ int main() {
     printf("Switching to XOSC\n");
     uart_default_tx_wait_blocking();
 
-    // UART will be reconfigured by sleep_run_from_xosc
+    /*Set the crystal oscillator as the dormant clock source, UART will be reconfigured from here
+    This is necessary before sending the pico to sleep*/
     sleep_run_from_xosc();
 
     printf("Running from XOSC\n");
@@ -74,7 +75,7 @@ int main() {
     // Go to sleep until the RTC interrupt is generated after 10 seconds
     rtc_sleep();
 
-    // //Restart the ROSC - this is crucial in preventing lock-up of the cores, so execution may continue
+    //Re-enabling clock sources and generators.
     sleep_power_up();
 
     printf("ROSC restarted!\n");

@@ -15,7 +15,8 @@ int main() {
     printf("Switching to XOSC\n");
     uart_default_tx_wait_blocking();
 
-    // UART will be reconfigured by sleep_run_from_xosc
+    /*Set the crystal oscillator as the dormant clock source, UART will be reconfigured from here
+    This is necessary before sending the pico to sleep*/
     sleep_run_from_xosc();
 
     printf("Running from XOSC\n");
@@ -27,12 +28,8 @@ int main() {
     // Go to sleep until we see a high edge on GPIO 10
     sleep_goto_dormant_until_edge_high(10);
 
+    //Re-enabling clock sources and generators.
     sleep_power_up();
-
-    uint i = 0;
-    while (1) {
-        printf("XOSC awake %d\n", i++);
-    }
 
     return 0;
 }

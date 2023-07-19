@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-/*In its current state, this is unreliable. The program usually runs for some unpredictable amount of time (anywhere in the range 30-50 loops)
-  However, after this the USB device fails to enumerate correctly and terminates the program. The issue seems to be related to power draw*/
+/*Note that the USB connection requires a reliable power source to run this program reliably, otherwise the USB connection will drop
+after some number of loops*/
 
 
 #include <stdio.h>
@@ -14,6 +14,7 @@
 #include "hardware/clocks.h"
 #include "hardware/pll.h"
 #include "device/usbd.h"
+#include "tusb.h"
 
 static bool awake;
 
@@ -55,17 +56,17 @@ static void rtc_sleep(void) {
 
 int main() {
     
-    /*Since the USB clock/PLL are disabled in sleep mode, we cannot print any serial output during sleep
-      All printf statements are before/after sleep here, in contrast to the UART example */
+    /*Since the USB clock/PLL are disabled in sleep mode, we cannot print any serial output after the run_from_dormant_source function
+      All printf statements are before/after rtc_sleep here, in contrast to the UART example */
 
     stdio_init_all();
 
     while(true)
-    {
-
-        //Let USB enumerate
+    {   
+        
         //FIXME: Any better way to do this with tight loop contents?
-        sleep_ms(5000);
+        //Let USB enumerate
+        sleep_ms(1000);
 
         printf("Switching to XOSC\n");
 
@@ -74,10 +75,13 @@ int main() {
             tight_loop_contents(); //Nop until the USB txfer is complete so we get reliable output
         }
 
+        /*Set the crystal oscillator as the dormant clock source, UART will be reconfigured from here
+        This is necessary before sending the pico to sleep*/
         sleep_run_from_xosc();
 
         awake = false;
 
+        // Go to sleep until the RTC interrupt is generated after 10 seconds
         rtc_sleep();
 
         // Make sure we don't wake
@@ -97,7 +101,7 @@ int main() {
         tud_connect();
         while(!tud_connected())
         {
-            tight_loop_contents();
+            tight_loop_contents(); //Make sure we are connected before continuing execution
         }
 
     }

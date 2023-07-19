@@ -264,6 +264,21 @@ App|Description
 [rtc_alarm](rtc/rtc_alarm) | Set an alarm on the RTC to trigger an interrupt at a date/time 5 seconds into the future.
 [rtc_alarm_repeat](rtc/rtc_alarm_repeat) | Trigger an RTC interrupt once per minute.
 
+### Sleep
+
+These examples showcase the pico's low power sleep and dormant modes. The difference between these is in the scale of the power-down. 
+
+Dormant mode is the true zero-dynamic-power state, where all clocks are stopped, until the source (either the xosc or the rosc) is woken up by an external event.
+Sleep mode is a low power state set by top-level clock gating. Some clocks (such as the RTC) can be left running by appropriately setting the SLEEP_ENx registers
+
+App|Description
+---|---
+[hello_sleep](sleep/hello_sleep) | Set the pico to low power sleep mode, waking it up from an alarm set on the RTC.
+[hello_sleep_usb](sleep/hello_sleep_usb) | Similar to hello_sleep, with serial output over USB instead of UART. This was added to show how to re-enumerate the USB device if sleeping and waking up in a loop.
+[hello_dormant](sleep/hello_dormant) | Set the pico to dormant mode, waking it up from a high edge on a GPIO pin.
+[hello_dormant_rtc](sleep/hello_dormant_rtc) | Set the pico to dormant mode with the RTC running from an external clock source. It is then woken up from an alarm set on the RTC.
+[sleep_temperature_sensor](sleep/sleep_temperature_sensor) | Read input from the onboard temperature sensor over the ADC and then go to low power sleep. The pico is then woken up from an alarm set on the RTC after a specified polling interval, repeating in a loop.
+
 ### SPI
 
 App|Description

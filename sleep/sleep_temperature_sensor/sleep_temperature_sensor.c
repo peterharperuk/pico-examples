@@ -4,7 +4,7 @@
 #include "hardware/resets.h"
 #include "pico/sleep.h"
 
-#define TEMPERATURE_UNITS 'C'
+#define TEMPERATURE_UNITS 'C' //Set to 'F' or 'C' for Fahrenheit or Celsius
 #define POLLING_INTERVAL 10
 
 void sleep_callback()
@@ -87,6 +87,7 @@ int main()
         This is necessary before sending the pico to sleep*/
         sleep_run_from_xosc();
 
+        // Go to sleep until the RTC interrupt is generated after the polling interval
         rtc_sleep();
 
         //Re-enabling clock sources and generators.
