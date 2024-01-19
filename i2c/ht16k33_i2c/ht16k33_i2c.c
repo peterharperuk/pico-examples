@@ -24,8 +24,7 @@
    GPIO 4 (pin 6)-> SDA on LED board
    GPIO 5 (pin 7)-> SCL on LED board
    GND (pin 38)  -> GND on LED board
-   5v (pin 40)   -> VCC on LED board
-   3.3v (pin 36) -> vi2c on LED board
+   3.3v (pin 36) -> VCC on LED board
 */
 
 // How many digits are on our display.
@@ -59,23 +58,29 @@ const int I2C_addr = 0x70;
 // Converts a character to the bit pattern needed to display the right segments.
 // These are pretty standard for 14segment LED's
 uint16_t char_to_pattern(char ch) {
-// Map, "A" to "Z"
+
+// how 7 digits are coded, plus the dot
+//
+//       0x01
+//  0x20      0x02
+//       0x40
+//  0x10      0x04
+//       0x08       0x80
+
 int16_t alpha[] = {
-    0xF7,0x128F,0x39,0x120F,0xF9,0xF1,0xBD,0xF6,0x1209,0x1E,0x2470,0x38,0x536,0x2136,
-    0x3F,0xF3,0x203F,0x20F3,0x18D,0x1201,0x3E,0xC30,0x2836,0x2D00,0x1500,0xC09
-    };
+  0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71,
+  };
 
-// Map, "0" to "9"
 int16_t num[] = {
-    0xC3F,0x406,0xDB,0x8F,0xE6,0xED,0xFD,0x1401,0xFF,0xE7
-    };
+    0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
+};
 
-    if (isalpha(ch))
+    if (ch >= 'A' && ch <= 'F')
         return alpha[toupper(ch) - 'A'];
     
     if (isdigit(ch))
         return num[ch - '0'];
-    
+
     return 0;
 }
 
@@ -95,23 +100,25 @@ void ht16k33_init() {
 
 // Send a specific binary value to the specified digit
 static inline void ht16k33_display_set(int position, uint16_t bin) {
-    uint8_t buf[3];
+    uint8_t buf[2];
+    assert(position <= 4);
     buf[0] = position * 2;
     buf[1] = bin & 0xff;
-    buf[2] = bin >> 8;
+    //buf[2] = bin >> 8;
 #ifdef i2c_default
     i2c_write_blocking(i2c_default, I2C_addr, buf, count_of(buf), false);
 #endif
 }
 
-static inline void ht16k33_display_char(int position, char ch) {
-    ht16k33_display_set(position, char_to_pattern(ch));
+static inline void ht16k33_display_char(int position, char ch, bool dot) {
+    if (position > 1) position++;
+    ht16k33_display_set(position, char_to_pattern(ch) | (dot ? 0x80 : 0x00));
 }
     
 void ht16k33_display_string(char *str) {
     int digit = 0;
-    while (*str && digit <= NUM_DIGITS) {
-        ht16k33_display_char(digit++, *str++);
+    while (*str && digit < NUM_DIGITS) {
+        ht16k33_display_char(digit++, *str++, false);
     }
 }
 
@@ -145,6 +152,11 @@ void ht16k33_set_blink(int blink) {
     i2c_write_byte(HT16K33_DISPLAY_SETUP | HT16K33_DISPLAY_ON | s);
 }
 
+void ht16k33_set_colon(bool on) {
+    // row 2 is used to turn the middle colon on
+    ht16k33_display_set(2, on ? 0x2 : 0);
+}
+
 int main() {
 
     stdio_init_all();
@@ -169,24 +181,16 @@ int main() {
     ht16k33_display_set(1, 0);
     ht16k33_display_set(2, 0);
     ht16k33_display_set(3, 0);
+    ht16k33_display_set(4, 0);
+
+    ht16k33_set_colon(true);
 
 again:
 
-    ht16k33_scroll_string("Welcome to the Raspberry Pi Pico", 150);
-
-    // Do a speeding up propeller effort using the inner segments
-    int bits[] = {0x40, 0x0100, 0x0200, 0x0400, 0x80, 0x2000, 0x1000, 0x0800};
-    for (int j = 0;j < 10;j++) {
-        for (int i = 0;i< count_of(bits); i++) {
-            for (int digit = 0;digit <= NUM_DIGITS; digit++) {
-                ht16k33_display_set(digit, bits[i]);
-            }
-            sleep_ms(155 - j*15);
-        }
-    }
+    ht16k33_scroll_string("0123456789ABCDEF", 500);
 
     char *strs[] = {
-        "Help", "I am", "in a", "Pico", "and ", "Cant", "get ", "out "
+        "1111", "2222", "3333", "4444", "5555 ", "6666", "7777", "8888"
     };
 
     for (int i = 0; i < count_of(strs); i++) {
@@ -199,10 +203,11 @@ again:
     // Test brightness and blinking
 
     // Set all segments on all digits on
-    ht16k33_display_set(0, 0xffff);
-    ht16k33_display_set(1, 0xffff);
-    ht16k33_display_set(2, 0xffff);
-    ht16k33_display_set(3, 0xffff);
+    ht16k33_display_set(0, 0xff);
+    ht16k33_display_set(1, 0xff);
+    ht16k33_display_set(2, 0xff);
+    ht16k33_display_set(3, 0xff);
+    ht16k33_display_set(4, 0xff);
 
     // Fade up and down
     for (int j=0;j<5;j++) {
