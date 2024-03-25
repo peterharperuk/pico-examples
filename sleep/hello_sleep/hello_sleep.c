@@ -58,29 +58,34 @@ int main() {
 
     printf("Hello Sleep!\n");
 
-    printf("Switching to XOSC\n");
+    do {
+        printf("Awake for 10 seconds\n");
+        sleep_ms(1000 * 10);
 
-    // Wait for the fifo to be drained so we get reliable output
-    uart_default_tx_wait_blocking();
+        printf("Switching to XOSC\n");
 
-    /*Set the crystal oscillator as the dormant clock source, UART will be reconfigured from here
-    This is necessary before sending the pico to sleep*/
-    sleep_run_from_xosc();
+        // Wait for the fifo to be drained so we get reliable output
+        uart_default_tx_wait_blocking();
 
-    printf("Switched to XOSC\n");
+        // Set the crystal oscillator as the dormant clock source, UART will be reconfigured from here
+        // This is necessary before sending the pico to sleep
+        sleep_run_from_xosc();
 
-    awake = false;
-    
-    // Go to sleep until the RTC interrupt is generated after 10 seconds
-    rtc_sleep();
+        printf("Switched to XOSC\n");
 
-    // Make sure we don't wake
-    while (!awake) {
-        printf("Should be sleeping\n");
-    }
+        awake = false;
 
-    //Re-enabling clock sources and generators.
-    sleep_power_up();
+        // Go to sleep until the RTC interrupt is generated after 10 seconds
+        rtc_sleep();
+
+        // Make sure we don't wake
+        while (!awake) {
+            printf("Should be sleeping\n");
+        }
+
+        //Re-enabling clock sources and generators.
+        sleep_power_up();
+    } while(true);
 
     return 0;
 }
