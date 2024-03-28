@@ -306,6 +306,13 @@ App|Description
 [ws2812](pio/ws2812) | Examples of driving WS2812 addressable RGB LEDs.
 [addition](pio/addition) | Add two integers together using PIO. Only around 8 billion times slower than Cortex-M0+.
 
+### POWMAN
+
+App|Description
+---|---
+[powman_timer](powman/powman_timer) | Example demonstrating how to turn the device off and back on at a certain time
+[powman_gpio](powman/powman_gpio) | Example demonstrating how to turn the device off and back on when a GPIO goes high
+
 ### PWM
 
 App|Description
