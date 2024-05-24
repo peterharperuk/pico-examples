@@ -66,9 +66,8 @@ int main() {
         
         //FIXME: Any better way to do this with tight loop contents?
         //Let USB enumerate
-        sleep_ms(1000);
-
-        printf("Switching to XOSC\n");
+        printf("Device awake for 10s\n");
+        sleep_ms(10000);
 
         while(tud_task_event_ready())
         {
@@ -80,6 +79,8 @@ int main() {
         sleep_run_from_xosc();
 
         awake = false;
+
+        printf("Going to sleep\n");
 
         // Go to sleep until the RTC interrupt is generated after 10 seconds
         rtc_sleep();
@@ -104,6 +105,8 @@ int main() {
             tight_loop_contents(); //Make sure we are connected before continuing execution
         }
 
+        sleep_ms(1000);
+        printf("USB is alive\n");
     }
 
     return 0;
