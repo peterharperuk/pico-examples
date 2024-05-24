@@ -56,7 +56,7 @@ int main() {
 
     stdio_init_all();
 
-    printf("Hello Sleep!\n");
+    printf("Hello RTC Sleep!\n");
 
     do {
         printf("Awake for 10 seconds\n");
