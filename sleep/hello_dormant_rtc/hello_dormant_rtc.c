@@ -14,7 +14,7 @@
 // This example needs an external clock fed into the GP20
 // Note: Only GP20 and GP22 can be used for clock input, See the GPIO function table in the RP2040 datasheet.
 // You can use another Pico to generate this. See the clocks/hello_gpout example for more details.
-// clock_gpio_init(25, CLOCKS_CLK_GPOUT3_CTRL_AUXSRC_VALUE_CLK_RTC, 1);
+// clock_gpio_init(21, CLOCKS_CLK_GPOUT3_CTRL_AUXSRC_VALUE_CLK_RTC, 1); // 46875Hz can only export a clock on gpios 21,23,24,25 and only 21 is exposed by Pico
 #define EXTERNAL_CLOCK_INPUT_PIN 20
 #define RTC_FREQ_HZ 46875
 
