@@ -20,6 +20,7 @@ target_link_libraries(picow_blink_slow_clock
         pico_stdlib              # for core functionality
         pico_cyw43_arch_none     # we need Wifi to access the GPIO, but we don't need anything else
         hardware_clocks
+        hardware_rosc
         )
 # This requires us to modify the pio divisor to successfully communicate with the cyw43 chip
 target_compile_definitions(picow_blink_slow_clock PRIVATE

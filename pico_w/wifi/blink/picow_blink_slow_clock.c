@@ -8,14 +8,56 @@
 #include "pico/cyw43_arch.h"
 #include "pico/cyw43_driver.h"
 #include "hardware/clocks.h"
+#include "hardware/pll.h"
+#include "hardware/rosc.h"
 
 int main() {
-    // Slow the sys clock down and speed up the cyw43 pio to compensate
-    // By default the pio used to communicate with cyw43 runs with a clock divisor of 2
-    // if you modify the clock you will have to compensate for this
-    // As an alternative you could specify CYW43_PIO_CLOCK_DIV_INT=x CYW43_PIO_CLOCK_DIV_FRAC=y in your cmake file
-    // To call cyw43_set_pio_clock_divisor you have to add CYW43_PIO_CLOCK_DIV_DYNAMIC=1 to your cmake file
-    set_sys_clock_khz(18000, true);
+    const uint src_hz = XOSC_HZ;
+    const uint clk_ref_src = CLOCKS_CLK_REF_CTRL_SRC_VALUE_XOSC_CLKSRC;
+
+    // CLK_REF = XOSC or ROSC
+    clock_configure(clk_ref,
+                    clk_ref_src,
+                    0, // No aux mux
+                    src_hz,
+                    src_hz);
+
+    // CLK SYS = CLK_REF
+    clock_configure(clk_sys,
+                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLK_REF,
+                    0, // Using glitchless mux
+                    src_hz,
+                    src_hz);
+
+    // CLK ADC = 0MHz
+    clock_stop(clk_adc);
+    clock_stop(clk_usb);
+#if PICO_RP2350
+    clock_stop(clk_hstx);
+#endif
+
+#if PICO_RP2040
+    // CLK RTC = ideally XOSC (12MHz) / 256 = 46875Hz
+    clock_configure(clk_rtc,
+                    0, // No GLMUX
+                    CLOCKS_CLK_RTC_CTRL_AUXSRC_VALUE_XOSC_CLKSRC,
+                    src_hz,
+                    46875);
+#endif
+
+    // CLK PERI = clk_sys. Used as reference clock for Peripherals. No dividers so just select and enable
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    src_hz,
+                    src_hz);
+
+    pll_deinit(pll_sys);
+    pll_deinit(pll_usb);
+
+    // Assuming both xosc and rosc are running at the moment
+    rosc_disable();
+
     cyw43_set_pio_clock_divisor(1, 0);
 
     stdio_init_all();
