@@ -75,14 +75,13 @@ int powman_example_off_until_gpio_high(int gpio) {
 // Power off until an absolute time
 int powman_example_off_until_time(uint64_t abs_time_ms) {
     // Start powman timer and turn off
-    printf("Powering off for %"PRIu64"ms\n", powman_timer_get_ms() - abs_time_ms);
+    printf("Powering off for %"PRIu64"ms\n", abs_time_ms - powman_timer_get_ms());
     powman_enable_alarm_wakeup_at_ms(abs_time_ms);
     return powman_example_off();
 }
 
 // Power off for a number of milliseconds
 int powman_example_off_for_ms(uint64_t duration_ms) {
-    printf("Powering off for %"PRIu64"ms\n", duration_ms);
     uint64_t ms = powman_timer_get_ms();
     return powman_example_off_until_time(ms + duration_ms);
 }

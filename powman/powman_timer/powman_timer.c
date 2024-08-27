@@ -10,7 +10,8 @@
 #include "powman_example.h"
 
 // How long to wait
-#define PAUSE_TIME_MS 5000
+#define AWAKE_TIME_MS 10000
+#define SLEEP_TIME_MS 5000
 
 // Got to sleep and wakeup after 5 seconds
 // The example will repeatedly wait 5 seconds then switch off for 5 seconds
@@ -25,11 +26,11 @@ int main() {
     printf("Wake up, test run: %u\n", powman_hw->scratch[0]++);
 
     // Stay awake for a few seconds
-    printf("Awake for %dms\n", PAUSE_TIME_MS);
-    sleep_ms(PAUSE_TIME_MS);
+    printf("Awake for %dms\n", AWAKE_TIME_MS);
+    sleep_ms(AWAKE_TIME_MS);
 
     // power off
-    int rc = powman_example_off_for_ms(PAUSE_TIME_MS);
+    int rc = powman_example_off_for_ms(SLEEP_TIME_MS);
     hard_assert(rc == PICO_OK);
 
     hard_assert(false); // should never get here!
