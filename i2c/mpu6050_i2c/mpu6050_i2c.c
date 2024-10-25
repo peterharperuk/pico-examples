@@ -10,6 +10,16 @@
 #include "pico/binary_info.h"
 #include "hardware/i2c.h"
 
+#define DEFAULT_I2C_ADDRESS 0x68
+
+#define EARTH_GRAVITY 9.80665
+
+const uint8_t REG_ACCEL_CONFIG = 0x1c;
+const uint8_t REG_ACCEL_XOUT = 0x3B;
+const uint8_t REG_TEMP_OUT = 0x41;
+const uint8_t REG_GYRO_XOUT = 0x43;
+const uint8_t REG_PWR_MGMT_1 = 0x6B;
+
 /* Example code to talk to a MPU6050 MEMS accelerometer and gyroscope
 
    This is taking to simple approach of simply reading registers. It's perfectly
@@ -31,14 +41,34 @@
 */
 
 // By default these devices  are on bus address 0x68
-static int addr = 0x68;
+static int addr = DEFAULT_I2C_ADDRESS;
+
+static int accel_range = 0;
+
+float convert_accel(int16_t raw) {
+    float div = 16384 >> accel_range;
+    return raw * (EARTH_GRAVITY / div);
+}
 
 #ifdef i2c_default
 static void mpu6050_reset() {
     // Two byte reset. First byte register, second byte data
     // There are a load more options to set up the device in different ways that could be added here
-    uint8_t buf[] = {0x6B, 0x80};
+    uint8_t res[] = {REG_PWR_MGMT_1, 0x80};
+    i2c_write_blocking(i2c_default, addr, res, 2, false);
+    sleep_ms(200);
+    uint8_t buf[] = {REG_PWR_MGMT_1, 0x00};
     i2c_write_blocking(i2c_default, addr, buf, 2, false);
+    sleep_ms(200);
+}
+
+static void mpu6050_set_range(int accel) {
+    hard_assert(accel >= 0 && accel <= 3);
+    uint8_t buf[2] = { REG_ACCEL_CONFIG };
+    i2c_write_blocking(i2c_default, addr, &buf[0], 1, true);
+    i2c_read_blocking(i2c_default, addr, &buf[1], 1, false);
+    buf[1] = (buf[1] & ~(0x3 << 3)) | (accel << 3);
+    i2c_write_blocking(i2c_default, addr, &buf[0], 2, false);
 }
 
 static void mpu6050_read_raw(int16_t accel[3], int16_t gyro[3], int16_t *temp) {
@@ -49,7 +79,7 @@ static void mpu6050_read_raw(int16_t accel[3], int16_t gyro[3], int16_t *temp) {
     uint8_t buffer[6];
 
     // Start reading acceleration registers from register 0x3B for 6 bytes
-    uint8_t val = 0x3B;
+    uint8_t val = REG_ACCEL_XOUT;
     i2c_write_blocking(i2c_default, addr, &val, 1, true); // true to keep master control of bus
     i2c_read_blocking(i2c_default, addr, buffer, 6, false);
 
@@ -59,7 +89,7 @@ static void mpu6050_read_raw(int16_t accel[3], int16_t gyro[3], int16_t *temp) {
 
     // Now gyro data from reg 0x43 for 6 bytes
     // The register is auto incrementing on each read
-    val = 0x43;
+    val = REG_GYRO_XOUT;
     i2c_write_blocking(i2c_default, addr, &val, 1, true);
     i2c_read_blocking(i2c_default, addr, buffer, 6, false);  // False - finished with bus
 
@@ -69,13 +99,14 @@ static void mpu6050_read_raw(int16_t accel[3], int16_t gyro[3], int16_t *temp) {
 
     // Now temperature from reg 0x41 for 2 bytes
     // The register is auto incrementing on each read
-    val = 0x41;
+    val = REG_TEMP_OUT;
     i2c_write_blocking(i2c_default, addr, &val, 1, true);
     i2c_read_blocking(i2c_default, addr, buffer, 2, false);  // False - finished with bus
 
     *temp = buffer[0] << 8 | buffer[1];
 }
 #endif
+
 
 int main() {
     stdio_init_all();
@@ -97,6 +128,8 @@ int main() {
 
     mpu6050_reset();
 
+    mpu6050_set_range(accel_range);
+
     int16_t acceleration[3], gyro[3], temp;
 
     while (1) {
@@ -104,13 +137,16 @@ int main() {
 
         // These are the raw numbers from the chip, so will need tweaking to be really useful.
         // See the datasheet for more information
-        printf("Acc. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2]);
+        printf("Acc. X = %f, Y = %f, Z = %f\n", convert_accel(acceleration[0]), convert_accel(acceleration[1]), convert_accel(acceleration[2]));
         printf("Gyro. X = %d, Y = %d, Z = %d\n", gyro[0], gyro[1], gyro[2]);
         // Temperature is simple so use the datasheet calculation to get deg C.
         // Note this is chip temperature.
         printf("Temp. = %f\n", (temp / 340.0) + 36.53);
 
-        sleep_ms(100);
+        sleep_ms(500);
+
+        // Clear terminal
+        printf("\033[1;1H\033[2J");
     }
 #endif
 }
