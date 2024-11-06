@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pico/async_context_poll.h"
 #include "bsp/board_api.h"
 #include "tusb.h"
 
@@ -43,9 +44,28 @@ extern uint8_t tuh_max3421_reg_read(uint8_t rhport, uint8_t reg, bool in_isr);
 extern bool tuh_max3421_reg_write(uint8_t rhport, uint8_t reg, uint8_t data, bool in_isr);
 #endif
 
+static void async_worker_func(async_context_t *async_context, async_at_time_worker_t *worker) {
+    tuh_task();
+
+    led_blinking_task();
+    cdc_app_task();
+    hid_app_task();
+
+    async_context_add_at_time_worker_in_ms(async_context, worker, 1); // call again in 1ms
+}
+
+// An async context is notified by the irq to "do some work"
+static async_context_poll_t async_context;
+static async_at_time_worker_t worker = { .do_work = async_worker_func };
+
 /*------------- MAIN -------------*/
 int main(void) {
   board_init();
+
+  // Setup an async context and worker to perform work when needed
+  if (!async_context_poll_init_with_defaults(&async_context)) {
+      panic("failed to setup context");
+  }
 
   printf("TinyUSB Host CDC MSC HID Example\r\n");
 
@@ -62,13 +82,11 @@ int main(void) {
   tuh_max3421_reg_write(BOARD_TUH_RHPORT, IOPINS1_ADDR, 0x01, false);
 #endif
 
-  while (1) {
-    // tinyusb host task
-    tuh_task();
+  async_context_add_at_time_worker_in_ms(&async_context, &worker, 1); // start worker
 
-    led_blinking_task();
-    cdc_app_task();
-    hid_app_task();
+  while (1) {
+    async_context_poll(&async_context.core);
+    async_context_wait_for_work_ms(&async_context.core, 1000);
   }
 }
 
