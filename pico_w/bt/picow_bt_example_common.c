@@ -84,10 +84,24 @@ int picow_bt_example_init(void) {
     return 0;
 }
 
+#if LED_BLINK
+#ifndef LED_BLINK_PERIOD_MS
+#define LED_BLINK_PERIOD_MS 1000
+#endif
+static void led_worker_func(async_context_t *context, async_at_time_worker_t *worker) {
+    hal_led_toggle();
+    async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), worker, LED_BLINK_PERIOD_MS);
+}
+static async_at_time_worker_t led_worker = { .do_work = led_worker_func };
+#endif
+
 void picow_bt_example_main(void) {
 
     btstack_main(0, NULL);
 
+#if LED_BLINK
+    async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &led_worker, LED_BLINK_PERIOD_MS);
+#endif
 #if TEST_BTWIFI
     uint32_t start_ms = to_ms_since_boot(get_absolute_time());
     cyw43_arch_enable_sta_mode();
