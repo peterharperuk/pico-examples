@@ -12,7 +12,20 @@
 #include "hardware/clocks.h"
 #include "ws2812.pio.h"
 
-#define IS_RGBW true
+/**
+ * NOTE:
+ *  Take into consideration if your WS2812 is a RGB or RGBW variant.
+ *
+ *  If it is RGBW, you need to set IS_RGBW to true and provide 4 bytes per 
+ *  pixel (Red, Green, Blue, White) and use urgbw_u32().
+ *
+ *  If it is RGB, set IS_RGBW to false and provide 3 bytes per pixel (Red,
+ *  Green, Blue) and use urgb_u32().
+ *
+ *  When RGBW is used with urgb_u32(), the White channel will be ignored (off).
+ *
+ */
+#define IS_RGBW false
 #define NUM_PIXELS 150
 
 #ifdef PICO_DEFAULT_WS2812_PIN
@@ -33,6 +46,14 @@ static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
             (uint32_t) (b);
 }
 
+static inline uint32_t urgbw_u32(uint8_t r, uint8_t g, uint8_t b, uint8_t w) {
+    return
+            ((uint32_t) (r) << 8) |
+            ((uint32_t) (g) << 16) |
+            ((uint32_t) (w) << 24) |
+            (uint32_t) (b);
+}
+
 void pattern_snakes(uint len, uint t) {
     for (uint i = 0; i < len; ++i) {
         uint x = (i + (t >> 1)) % 64;
@@ -50,21 +71,21 @@ void pattern_snakes(uint len, uint t) {
 void pattern_random(uint len, uint t) {
     if (t % 8)
         return;
-    for (int i = 0; i < len; ++i)
+    for (uint i = 0; i < len; ++i)
         put_pixel(rand());
 }
 
 void pattern_sparkle(uint len, uint t) {
     if (t % 8)
         return;
-    for (int i = 0; i < len; ++i)
+    for (uint i = 0; i < len; ++i)
         put_pixel(rand() % 16 ? 0 : 0xffffffff);
 }
 
 void pattern_greys(uint len, uint t) {
-    int max = 100; // let's not draw too much current!
+    uint max = 100; // let's not draw too much current!
     t %= max;
-    for (int i = 0; i < len; ++i) {
+    for (uint i = 0; i < len; ++i) {
         put_pixel(t * 0x10101);
         if (++t >= max) t = 0;
     }

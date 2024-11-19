@@ -3,6 +3,7 @@
 ;
 ; SPDX-License-Identifier: BSD-3-Clause
 ;
+.pio_version 0 // only requires PIO version 0
 
 .program quadrature_encoder
 
@@ -98,6 +99,9 @@ increment_cont:
 static inline void quadrature_encoder_program_init(PIO pio, uint sm, uint pin, int max_step_rate)
 {
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 2, false);
+    pio_gpio_init(pio, pin);
+    pio_gpio_init(pio, pin + 1);
+
     gpio_pull_up(pin);
     gpio_pull_up(pin + 1);
 
