@@ -32,7 +32,12 @@
 #define WS2812_PIN PICO_DEFAULT_WS2812_PIN
 #else
 // default to pin 2 if the board doesn't have a default WS2812 pin defined
-#define WS2812_PIN 2
+#define WS2812_PIN 33
+#endif
+
+// Check the pin is compatible with the platform
+#if WS2812_PIN >= 32 && !PICO_PIO_USE_GPIO_BASE
+#error Attempting to use a pin>32 on a platform that does not support it
 #endif
 
 static inline void put_pixel(PIO pio, uint sm, uint32_t pixel_grb) {

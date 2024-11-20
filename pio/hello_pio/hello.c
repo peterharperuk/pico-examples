@@ -14,7 +14,12 @@
 // This example uses the default led pin
 // You can change this by defining HELLO_PIO_LED_PIN to use a different gpio
 #if !defined HELLO_PIO_LED_PIN && defined PICO_DEFAULT_LED_PIN
-#define HELLO_PIO_LED_PIN PICO_DEFAULT_LED_PIN
+#define HELLO_PIO_LED_PIN 33
+#endif
+
+// Check the pin is compatible with the platform
+#if HELLO_PIO_LED_PIN >= 32 && !PICO_PIO_USE_GPIO_BASE
+#error Attempting to use a pin>32 on a platform that does not support it
 #endif
 
 int main() {

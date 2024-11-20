@@ -17,7 +17,12 @@
 
 #define FRAC_BITS 4
 #define NUM_PIXELS 64
-#define WS2812_PIN_BASE 2
+#define WS2812_PIN_BASE 33
+
+// Check the pin is compatible with the platform
+#if WS2812_PIN_BASE >= NUM_BANK0_GPIOS
+#error Attempting to use a pin>32 on a platform that does not support it
+#endif
 
 // horrible temporary hack to avoid changing pattern code
 static uint8_t *current_strip_out;
