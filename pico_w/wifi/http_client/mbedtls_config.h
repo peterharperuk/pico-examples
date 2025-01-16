@@ -3,4 +3,8 @@
 
 #include "mbedtls_config_examples_common.h"
 
+#ifndef NDEBUG
+#define MBEDTLS_DEBUG_C
+#endif
+
 #endif

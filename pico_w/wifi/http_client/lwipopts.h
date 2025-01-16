@@ -20,8 +20,6 @@
 
 // Note bug in lwip with LWIP_ALTCP and LWIP_DEBUG
 // https://savannah.nongnu.org/bugs/index.php?62159
-//#define LWIP_DEBUG 1
 #undef LWIP_DEBUG
-#define ALTCP_MBEDTLS_DEBUG  LWIP_DBG_ON
 
 #endif

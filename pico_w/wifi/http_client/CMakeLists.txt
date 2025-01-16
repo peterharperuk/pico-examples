@@ -1,9 +1,11 @@
+add_subdirectory(http_client_mod)
+
 pico_add_library(example_lwip_http_util NOFLAG)
 target_sources(example_lwip_http_util INTERFACE
         ${CMAKE_CURRENT_LIST_DIR}/example_http_client_util.c
         )
 pico_mirrored_target_link_libraries(example_lwip_http_util INTERFACE
-        pico_lwip_http
+        pico_lwip_http_client_mod
         pico_lwip_mbedtls
         pico_mbedtls
         )

@@ -7,7 +7,7 @@
 #ifndef EXAMPLE_HTTP_CLIENT_UTIL_H
 #define EXAMPLE_HTTP_CLIENT_UTIL_H
 
-#include "lwip/apps/http_client.h"
+#include "http_client_mod.h"
 
 /*! \brief Parameters used to make HTTP request
  *  \ingroup pico_lwip
@@ -33,6 +33,7 @@ typedef struct EXAMPLE_HTTP_REQUEST {
     altcp_recv_fn recv_fn;
     /*!
      * Function to callback with final results of the request, can be null
+     * @return true to keep the connection alive and make more requests
      * @see httpc_result_fn
      */
     httpc_result_fn result_fn;
@@ -51,7 +52,7 @@ typedef struct EXAMPLE_HTTP_REQUEST {
      */
     struct altcp_tls_config *tls_config;
     /*!
-     * TLS allocator, used internall for setting TLS server name indication
+     * TLS allocator, used internally for setting TLS server name indication
      */
     altcp_allocator_t tls_allocator;
 #endif
@@ -64,10 +65,13 @@ typedef struct EXAMPLE_HTTP_REQUEST {
      */
     int complete;
     /*!
-     * Overall result of http request, only valid when complete is set
+     * Overall result of http request
      */
     httpc_result_t result;
-
+    /*!
+     * Gets a pointer to internal http client
+     */
+    httpc_state_t *connection;
 } EXAMPLE_HTTP_REQUEST_T;
 
 struct async_context;

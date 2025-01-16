@@ -25,7 +25,7 @@
 
 #ifndef HTTP_DEBUG
 #ifdef NDEBUG
-#define HTTP_DEBUG
+#define HTTP_DEBUG(...)
 #else
 #define HTTP_DEBUG printf
 #endif
@@ -48,7 +48,7 @@ err_t http_client_header_print_fn(__unused httpc_state_t *connection, __unused v
 
 // Print body to stdout
 err_t http_client_receive_print_fn(__unused void *arg, __unused struct altcp_pcb *conn, struct pbuf *p, err_t err) {
-    HTTP_INFO("\ncontent err %d\n", err);
+    HTTP_INFO("\ncontent err %d len %u\n", err, p->tot_len);
     u16_t offset = 0;
     while (offset < p->tot_len) {
         char c = (char)pbuf_get_at(p, offset++);
@@ -71,20 +71,26 @@ static err_t internal_recv_fn(void *arg, struct altcp_pcb *conn, struct pbuf *p,
     assert(arg);
     EXAMPLE_HTTP_REQUEST_T *req = (EXAMPLE_HTTP_REQUEST_T*)arg;
     if (req->recv_fn) {
-        return req->recv_fn(req->callback_arg, conn, p, err);
+        req->recv_fn(req->callback_arg, conn, p, err);
     }
+    altcp_recved(conn, p->tot_len);
+    pbuf_free(p);
     return ERR_OK;
 }
 
-static void internal_result_fn(void *arg, httpc_result_t httpc_result, u32_t rx_content_len, u32_t srv_res, err_t err) {
+static int internal_result_fn(void *arg, httpc_result_t httpc_result, u32_t rx_content_len, u32_t srv_res, err_t err) {
+    int more = 0;
     assert(arg);
     EXAMPLE_HTTP_REQUEST_T *req = (EXAMPLE_HTTP_REQUEST_T*)arg;
     HTTP_DEBUG("result %d len %u server_response %u err %d\n", httpc_result, rx_content_len, srv_res, err);
-    req->complete = true;
     req->result = httpc_result;
     if (req->result_fn) {
-        req->result_fn(req->callback_arg, httpc_result, rx_content_len, srv_res, err);
+        more = req->result_fn(req->callback_arg, httpc_result, rx_content_len, srv_res, err);
     }
+    if (!more) {
+        req->complete = true;
+    }
+    return more;
 }
 
 // Override altcp_tls_alloc to set sni
@@ -118,7 +124,7 @@ int http_client_request_async(async_context_t *context, EXAMPLE_HTTP_REQUEST_T *
     req->settings.headers_done_fn = req->headers_fn ? internal_header_fn : NULL;
     req->settings.result_fn = internal_result_fn;
     async_context_acquire_lock_blocking(context);
-    err_t ret = httpc_get_file_dns(req->hostname, req->port ? req->port : default_port, req->url, &req->settings, internal_recv_fn, req, NULL);
+    err_t ret = httpc_get_file_dns(req->hostname, req->port ? req->port : default_port, req->url, &req->settings, internal_recv_fn, req, &req->connection);
     async_context_release_lock(context);
     if (ret != ERR_OK) {
         HTTP_ERROR("http request failed: %d", ret);
