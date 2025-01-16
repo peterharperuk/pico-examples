@@ -72,6 +72,21 @@ int powman_example_off_until_gpio_high(int gpio) {
     return powman_example_off();
 }
 
+// Power off until a gpio goes low
+int powman_example_off_until_gpio_low(int gpio) {
+    gpio_init(gpio);
+    gpio_set_dir(gpio, false);
+    if (!gpio_get(gpio)) {
+        printf("Waiting for gpio %d to go high\n", gpio);
+        while(!gpio_get(gpio)) {
+            sleep_ms(100);
+        }
+    }
+    printf("Powering off until GPIO %d goes low\n", gpio);
+    powman_enable_gpio_wakeup(0, gpio, false, false);
+    return powman_example_off();
+}
+
 // Power off until an absolute time
 int powman_example_off_until_time(uint64_t abs_time_ms) {
     // Start powman timer and turn off
