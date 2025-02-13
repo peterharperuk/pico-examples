@@ -144,10 +144,11 @@ static void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint
                     uint16_t value_length = gatt_event_notification_get_value_length(packet);
                     const uint8_t *value = gatt_event_notification_get_value(packet);
                     DEBUG_LOG("Indication value len %d\n", value_length);
-                    if (value_length == 2) {
+                    static uint32_t counter;
+                    if (value_length == 2 && counter++ % 40 == 0) {
                         float temp = little_endian_read_16(value, 0);
-                        printf("read temp %.2f degc\n", temp / 100);
-                    } else {
+                        printf("read temp %.2f degc %u updates\n", temp / 100, counter);
+                    } else if (value_length != 2) {
                         printf("Unexpected length %d\n", value_length);
                     }
                     break;
@@ -243,7 +244,12 @@ static void heartbeat_handler(struct btstack_timer_source *ts) {
     btstack_run_loop_add_timer(ts);
 }
 
+#include "hardware/clocks.h"
+
 int main() {
+
+    set_sys_clock_khz(200000, true);
+
     stdio_init_all();
 
     // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)

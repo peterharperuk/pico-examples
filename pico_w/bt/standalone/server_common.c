@@ -102,5 +102,9 @@ void poll_temp(void) {
     // Typically, Vbe = 0.706V at 27 degrees C, with a slope of -1.721mV (0.001721) per degree. 
     float deg_c = 27 - (reading - 0.706) / 0.001721;
     current_temp = deg_c * 100;
-    printf("Write temp %.2f degc\n", deg_c);
- }
+
+    static uint32_t counter;
+    if (counter++ % 40 == 0) {
+        printf("Write temp %.2f degc %u updates\n", deg_c, counter);
+    }
+}

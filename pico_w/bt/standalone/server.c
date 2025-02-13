@@ -13,7 +13,7 @@
 
 #include "server_common.h"
 
-#define HEARTBEAT_PERIOD_MS 1000
+#define HEARTBEAT_PERIOD_MS 40
 
 static btstack_timer_source_t heartbeat;
 static btstack_packet_callback_registration_t hci_event_callback_registration;
@@ -23,24 +23,30 @@ static void heartbeat_handler(struct btstack_timer_source *ts) {
     counter++;
 
     // Update the temp every 10s
-    if (counter % 10 == 0) {
+    if (true || counter % 10 == 0) {
         poll_temp();
         if (le_notification_enabled) {
             att_server_request_can_send_now_event(con_handle);
         }
     }
 
-    // Invert the led
-    static int led_on = true;
-    led_on = !led_on;
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    if (counter % (1000 / HEARTBEAT_PERIOD_MS) == 0) {
+        // Invert the led
+        static int led_on = true;
+        led_on = !led_on;
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    }
 
     // Restart timer
     btstack_run_loop_set_timer(ts, HEARTBEAT_PERIOD_MS);
     btstack_run_loop_add_timer(ts);
 }
 
+#include "hardware/clocks.h"
+
 int main() {
+    set_sys_clock_khz(200000, true);
+
     stdio_init_all();
 
     // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)
@@ -78,7 +84,7 @@ int main() {
     // This example uses the 'threadsafe background` method, where BT work is handled in a low priority IRQ, so it
     // is fine to call bt_stack_run_loop_execute() but equally you can continue executing user code.
 
-#if 0 // btstack_run_loop_execute() is not required, so lets not use it
+#if 1 // btstack_run_loop_execute() is not required, so lets not use it
     btstack_run_loop_execute();
 #else
     // this core is free to do it's own stuff except when using 'polling' method (in which case you should use 

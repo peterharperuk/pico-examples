@@ -7,12 +7,15 @@ target_link_libraries(picow_ble_temp_sensor
     pico_stdlib
     pico_btstack_ble
     pico_btstack_cyw43
-    pico_cyw43_arch_none
+    pico_cyw43_arch_poll
     hardware_adc
     )
 target_include_directories(picow_ble_temp_sensor PRIVATE
     ${CMAKE_CURRENT_LIST_DIR} # For btstack config
     )
+target_compile_definitions(picow_ble_temp_sensor PRIVATE
+    CYW43_LWIP=0
+)
 pico_btstack_make_gatt_header(picow_ble_temp_sensor PRIVATE "${CMAKE_CURRENT_LIST_DIR}/temp_sensor.gatt")
 
 pico_add_extra_outputs(picow_ble_temp_sensor)
@@ -28,7 +31,7 @@ target_link_libraries(picow_ble_temp_reader
     pico_stdlib
     pico_btstack_ble
     pico_btstack_cyw43
-    pico_cyw43_arch_none
+    pico_cyw43_arch_poll
     hardware_adc
     )
 target_include_directories(picow_ble_temp_reader PRIVATE
@@ -36,6 +39,7 @@ target_include_directories(picow_ble_temp_reader PRIVATE
     )
 target_compile_definitions(picow_ble_temp_reader PRIVATE
     RUNNING_AS_CLIENT=1
+    CYW43_LWIP=0
 )
 
 pico_add_extra_outputs(picow_ble_temp_reader)
@@ -50,7 +54,7 @@ if (WIFI_SSID AND WIFI_PASSWORD)
         pico_stdlib
         pico_btstack_ble
         pico_btstack_cyw43
-        pico_cyw43_arch_lwip_threadsafe_background
+        pico_cyw43_arch_lwip_poll
         pico_lwip_iperf
         hardware_adc
         )
