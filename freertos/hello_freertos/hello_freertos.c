@@ -28,16 +28,16 @@
 
 // Whether to busy wait in the led thread
 #ifndef LED_BUSY_WAIT
-#define LED_BUSY_WAIT 1
+#define LED_BUSY_WAIT 0
 #endif
 
 // Delay between led blinking
 #define LED_DELAY_MS 2000
 
 // Priorities of our threads - higher numbers are higher priority
-#define MAIN_TASK_PRIORITY      ( tskIDLE_PRIORITY + 2UL )
-#define BLINK_TASK_PRIORITY     ( tskIDLE_PRIORITY + 1UL )
-#define WORKER_TASK_PRIORITY    ( tskIDLE_PRIORITY + 4UL )
+#define MAIN_TASK_PRIORITY      ( tskIDLE_PRIORITY + 3UL )
+#define BLINK_TASK_PRIORITY     ( tskIDLE_PRIORITY + 2UL )
+#define WORKER_TASK_PRIORITY    ( tskIDLE_PRIORITY + 1UL )
 
 // Stack sizes of our threads in words (4 bytes)
 #define MAIN_TASK_STACK_SIZE configMINIMAL_STACK_SIZE
@@ -121,6 +121,17 @@ static void do_work(async_context_t *context, async_at_time_worker_t *worker) {
 }
 async_at_time_worker_t worker_timeout = { .do_work = do_work };
 
+// Note: This is called from an interrupt handler
+void key_pressed_func(void *param) {
+    int key = getchar_timeout_us(0); // get any pending key press but don't wait
+    if (key == 'q' || key == 'Q') {
+        bool *exit = (bool*)param;
+        *exit = true;
+    }
+}
+
+static bool exit = false;
+
 void main_task(__unused void *params) {
     async_context_t *context = example_async_context();
     // start the worker running
@@ -129,8 +140,9 @@ void main_task(__unused void *params) {
     // start the led blinking
     xTaskCreate(blink_task, "BlinkThread", BLINK_TASK_STACK_SIZE, NULL, BLINK_TASK_PRIORITY, NULL);
 #endif
+
     int count = 0;
-    while(true) {
+    while(!exit) {
 #if configNUMBER_OF_CORES > 1
         static int last_core_id = -1;
         if (portGET_CORE_ID() != last_core_id) {
@@ -142,6 +154,7 @@ void main_task(__unused void *params) {
         vTaskDelay(3000);
     }
     async_context_deinit(context);
+    sleep_ms(1000);
 }
 
 void vLaunch( void) {
@@ -160,6 +173,8 @@ void vLaunch( void) {
 int main( void )
 {
     stdio_init_all();
+
+    stdio_set_chars_available_callback(key_pressed_func, &exit);
 
     /* Configure the hardware ready to run the demo. */
     const char *rtos_name;
