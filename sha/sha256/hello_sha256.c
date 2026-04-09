@@ -6,10 +6,6 @@
 
 #include <stdio.h>
 #include <string.h>
-// Include sys/types.h before inttypes.h to work around issue with
-// certain versions of GCC and newlib which causes omission of PRIu64
-#include <sys/types.h>
-#include <inttypes.h>
 #include <stdlib.h>
 
 #include "pico/stdlib.h"
@@ -51,11 +47,10 @@ static void sha_example() {
     hard_assert(memcmp(sha_expected, &result, SHA256_RESULT_BYTES) == 0);
 }
 
-
 #define BUFFER_SIZE 10000
 
 // A performance test with a large amount of data
-static void nist_test(bool use_dma) {
+static uint32_t nist_test(bool use_dma) {
     // nist 3
     uint8_t *buffer = malloc(BUFFER_SIZE);
     memset(buffer, 0x61, BUFFER_SIZE);
@@ -75,8 +70,15 @@ static void nist_test(bool use_dma) {
 
     // Display the time taken
     uint64_t pico_time = time_us_64() - start;
-    printf("Time for sha256 of 1M bytes %s DMA %"PRIu64"ms\n", use_dma ? "with" : "without", pico_time / 1000);
     hard_assert(memcmp(nist_3_expected, result.bytes, SHA256_RESULT_BYTES) == 0);
+    return pico_time / 1000;
+}
+
+static uint32_t alarm_wait_us;
+static int64_t alarm_callback(alarm_id_t id, void *user_data) {
+    busy_wait_us(100); // pretend to be busy for 1ms
+    alarm_wait_us += 100;
+    return 100; // run again in 100us
 }
 
 int main() {
@@ -85,8 +87,23 @@ int main() {
     sha_example();
 
     // performance test with and without DMA
-    nist_test(false);
-    nist_test(true);
+    uint32_t time_ms = nist_test(false);
+    printf("Time for sha256 of 1M bytes without DMA %ums\n", time_ms);
+
+    time_ms = nist_test(true);
+    printf("Time for sha256 of 1M bytes with DMA %ums\n", time_ms);
+
+    // repeat the test with lots of interrupts
+    alarm_id_t id = add_alarm_in_ms(1, alarm_callback, NULL, true);
+    time_ms = nist_test(false);
+    cancel_alarm(id);
+    printf("Time for sha256 of 1M bytes without DMA %ums and %ums of interrupt delays\n", time_ms, alarm_wait_us / 1000);
+
+    alarm_wait_us = 0;
+    id = add_alarm_in_ms(1, alarm_callback, NULL, true);
+    time_ms = nist_test(true);
+    cancel_alarm(id);
+    printf("Time for sha256 of 1M bytes with DMA %ums and %ums of interrupt delays\n", time_ms, alarm_wait_us / 1000);
 
     printf("Success\n");
 }
