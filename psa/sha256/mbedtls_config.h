@@ -1,0 +1,18 @@
+#ifndef _MBEDTLS_CONFIG_H
+#define _MBEDTLS_CONFIG_H
+
+#define MBEDTLS_SHA256_C
+#if LIB_PICO_SHA256
+// Enable hardware acceleration
+//#define MBEDTLS_SHA256_ALT
+#endif
+
+#define MBEDTLS_PSA_CRYPTO_C 
+
+#define MBEDTLS_NO_PLATFORM_ENTROPY
+#define MBEDTLS_ENTROPY_HARDWARE_ALT
+#define MBEDTLS_ENTROPY_C
+#define MBEDTLS_CTR_DRBG_C
+#define MBEDTLS_AES_C
+
+#endif

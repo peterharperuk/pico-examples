@@ -1,0 +1,2 @@
+add_subdirectory_exclude_platforms(sha256)
+add_subdirectory_exclude_platforms(ecdsa)
