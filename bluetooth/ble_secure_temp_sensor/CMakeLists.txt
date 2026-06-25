@@ -1,22 +1,4 @@
-# Select a security setting to explore the BLE security
-#
-# security setting 0: Just works (pairing), no MITM (Man In The Middle) protection
-#  client and server have no input or output support
-#
-# security setting 1: Numeric comparison with MITM protection
-#  client can query yes or no from the user, server has a display only
-#  server displays passkey
-#  client displays passkey and user can select Yes or No if they agree the passkey is from the server
-#
-# security setting 2:
-#  client has a keyboard and display, server has a display only
-#  server displays passkey
-#  client user enters the passkey displayed by the server
-#
-# security setting 3:
-#  client has a display only, server has a display and keyboard
-#  Client displays passkey
-#  server user enters the passkey displayed by the server
+# Select a security setting to explore the BLE security. See README.md for details
 if (NOT DEFINED SECURITY_SETTING)
     set(SECURITY_SETTING 0)
 endif()
@@ -41,7 +23,7 @@ target_compile_definitions(ble_secure_temp_server PRIVATE
     # Wait up to 3s for stdio USB to initialise, to avoid losing any debug on startup
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=3000
     SECURITY_SETTING=${SECURITY_SETTING}
-    #WANT_HCI_DUMP=1
+    WANT_HCI_DUMP=1
 )
 pico_btstack_make_gatt_header(ble_secure_temp_server PRIVATE "${CMAKE_CURRENT_LIST_DIR}/temp_sensor.gatt")
 pico_add_extra_outputs(ble_secure_temp_server)
